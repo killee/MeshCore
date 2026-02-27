@@ -1,0 +1,51 @@
+name: Build Heltec V3 Companion WiFi Firmware
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - ci/heltec-v3-companion-wifi-artifacts
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      PIO_ENV: ${{ github.event.inputs.PIO_ENV || 'auto' }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v2
+
+      - name: Cache PlatformIO
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.platformio
+            .pio
+          key: platformio-${{ runner.os }}-${{ hashFiles('**/platformio.ini') }}
+
+      - name: Install Python
+        run: |
+          sudo apt-get install python3
+
+      - name: Install PlatformIO
+        run: |
+          pip install platformio
+
+      - name: List Available Environments
+        run: |
+          platformio project env list
+          if ! platformio project env list | grep -q '${{ env.PIO_ENV }}'; then
+            echo 'Error: Expected environment ${env.PIO_ENV} not found!'
+            exit 1
+          fi
+
+      - name: Build Firmware
+        run: |
+          platformio run -e ${{ env.PIO_ENV }} -- -D WIFI_SSID="${{ secrets.WIFI_SSID }}" -D WIFI_PWD="${{ secrets.WIFI_PWD }}"
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: firmware-files
+          path: .pio/build/**/{firmware.bin,bootloader.bin,partitions.bin,*.bin}
